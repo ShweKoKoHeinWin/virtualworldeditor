@@ -21,12 +21,36 @@
         <button onclick="removeRandomSegment()">Remove Segments</button>
         <button onclick="dispose()">Remove All</button>
         <button onclick="save()">Save</button>
+        <label for="fileInput">
+            File 
+            <input type="file" id="fileInput" accept=".world" onchange="load(event)">
+        </label>
+        <button id="graphBtn" onclick="setMode('graph')">Graph Mode</button>
+        <button id="stopBtn" onclick="setMode('stop')">Stop Mode</button>
+        <button id="crossBtn" onclick="setMode('cross')">Cross Mode</button>
+        <button id="startBtn" onclick="setMode('start')">Start Mode</button>
+        <button id="lightBtn" onclick="setMode('light')">Light Mode</button>
+        <button id="parkingBtn" onclick="setMode('parking')">Park Mode</button>
     </div>
 
-    <script src="/js/graphEditor.js"></script>
     <script src="/js/world.js"></script>
     <script src="/js/viewport.js"></script>
+    <script src="/js/editors/markingEditor.js"></script>
+    <script src="/js/editors/graphEditor.js"></script>
+    <script src="/js/editors/stopEditor.js"></script>
+    <script src="/js/editors/crossEditor.js"></script>
+    <script src="/js/editors/startEditor.js"></script>
+    <script src="/js/editors/lightEditor.js"></script>
+    <script src="/js/editors/parkingEditor.js"></script>
     <script src="/js/math/graph.js"></script>
+    <script src="/js/markings/markings.js"></script>
+    <script src="/js/markings/stop.js"></script>
+    <script src="/js/markings/cross.js"></script>
+    <script src="/js/markings/start.js"></script>
+    <script src="/js/markings/light.js"></script>
+    <script src="/js/markings/parking.js"></script>
+    <script src="/js/items/tree.js"></script>
+    <script src="/js/items/building.js"></script>
     <script src="/js/math/utility.js"></script>
     <script src="js/primitives/point.js"></script>
     <script src="js/primitives/segment.js"></script>
@@ -46,7 +70,8 @@
         }
 
         function dispose() {
-            graphEditor.dispose();
+            tools.graph.editor.dispose();
+            world.markings.length = 0;
             localStorage.removeItem('graph');
         }
 
@@ -129,24 +154,50 @@
 
         const ctx = myCanvas.getContext('2d');
 
-        const graphString = localStorage.getItem('graph');
-        const graphInfo = graphString ? JSON.parse(graphString) : null;
+        // const graphString = localStorage.getItem('graph');
+        // const graphInfo = graphString ? JSON.parse(graphString) : null;
+        const worldString = localStorage.getItem('world');
+        const worldInfo = worldString ? JSON.parse(worldString) : null;
 
-        const graph = graphInfo ?  Graph.load(graphInfo) : new Graph();
-        const world = new World(graph);
-        const viewport = new Viewport(myCanvas);
-        const graphEditor = new GraphEditor(viewport, graph);
+        
+        // const graph = graphInfo ?  Graph.load(graphInfo) : new Graph();
+        let world = worldInfo ?  World.load(worldInfo) : new World(new Graph());
+        const graph = world.graph;
+        // const world = new World(graph);
+        const viewport = new Viewport(myCanvas, world.zoom, world.offset);
+        // const graphEditor = new GraphEditor(viewport, graph);
+        // const stopEditor = new StopEditor(viewport, world);
+        // const crossEditor = new CrossEditor(viewport, world);
+        let oldGraphHash = graph.hash();    // define old graph
 
+        const tools = {     //this will store all object looped these so just add here new
+            graph : {button: graphBtn, editor: new GraphEditor(viewport, graph)},
+            stop : {button: stopBtn, editor: new StopEditor(viewport, world)},
+            cross : {button: crossBtn, editor: new CrossEditor(viewport, world)},
+            start : {button: startBtn, editor: new StartEditor(viewport, world)},
+            light : {button: lightBtn, editor: new LightEditor(viewport, world)},
+            parking : {button: parkingBtn, editor: new ParkingEditor(viewport, world)},
+        }
+        
         animate();
         function animate() {
             viewport.reset();
 
             // new Polygon(graph.points).draw(ctx);
+            if(graph.hash() != oldGraphHash) {  //if current graph is not same as old graph
+                world.generate();
+                oldGraphHash = graph.hash();
+            }
+            const viewPoint = scale(viewport.getOffset(), - 1);
+            world.draw(ctx, viewPoint);
+           ctx.globalAlpha = 0.3;
 
-            world.generate();
-            world.draw(ctx);
-           
-            graphEditor.display();
+           for(const tool of Object.values(tools)) {
+            tool.editor.display();
+           }
+            // graphEditor.display();
+            // stopEditor.display();
+            // crossEditor.display();
 
             // new Envelope(graph.segments[0], 200, 100).draw(ctx);
             
@@ -156,7 +207,102 @@
         // graph.draw(ctx);
 
         function save() {
-            localStorage.setItem('graph', JSON.stringify(graph));
+            world.zoom = viewport.zoom;
+            world.offset = viewport.offset;
+            const element = document.createElement('a');
+            element.setAttribute('href', "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(world)));
+            const fileName = "name.world";
+            element.setAttribute('download', fileName);
+            element.click();
+
+            localStorage.setItem('world', JSON.stringify(world));
+            let alerm = document.createElement('div');
+            alerm.style.background = 'blue';
+            alerm.style.color = 'white';
+            alerm.style.border = 'solid 3px green';
+            alerm.style.padding = '20px';
+            alerm.style.position = 'fixed';
+            alerm.style.left = '50%';
+            alerm.style.top = '50%';
+            alerm.style.transform = 'translate(-50%, -50%)';
+            alerm.style.width = '200px';
+            alerm.style.height = '100px';
+            alerm.style.display = 'flex';
+            alerm.style.alignContent = 'center';
+            alerm.style.justifyItems = 'center';
+            // let timingBox = document.createElement('div');
+            // timingBox.style.background = 'gray';
+            // timingBox.style.borderRadius = '50%';
+            let text = document.createElement('p');
+            text.textContent = 'Saved';
+            text.style.textAlign = 'center%';
+            alerm.appendChild(text);
+            document.body.appendChild(alerm);
+            setTimeout(function() {
+                alerm.remove();
+            }, 3000);
+        }
+
+        function load(event) {
+            const file = event.target.files[0];
+            if(!file) {
+                alert('No file');
+                return;
+            }
+            const reader = new FileReader();
+            reader.readAsText(file);
+            reader.onload = (event) => {
+                const fileContent = event.target.result;
+                const jsonData = JSON.parse(fileContent);
+                world = World.load(jsonData);
+                localStorage.setItem('world', JSON.stringify(world));
+                location.reload();
+            }
+        }
+
+        setMode('graph');
+
+        function setMode(mode) {
+            disableEditor();
+            tools[mode].editor.enable()
+            tools[mode].button.style.background = 'white';
+            tools[mode].button.style.filter = '';
+            // switch(mode) {
+            //     case 'graph':
+            //     graphBtn.style.background = 'white';
+            //     graphBtn.style.filter = '';
+            //     graphEditor.enable();
+            //     break;
+
+            //     case 'stop':
+            //     stopBtn.style.background = 'white';
+            //     stopBtn.style.filter = '';
+            //     stopEditor.enable();
+            //     break;
+
+            //     case 'cross':
+            //     crossBtn.style.background = 'white';
+            //     crossBtn.style.filter = '';
+            //     crossEditor.enable();
+            //     break;
+            // }
+        }
+
+        function disableEditor() {
+            for(const tool of Object.values(tools)) {
+                tool.editor.disable();
+                tool.button.style.background = 'red';
+                tool.button.style.filter = 'grayscale(100%)';
+            }
+            // graphEditor.disable();
+            // graphBtn.style.background = 'red';
+            // graphBtn.style.filter = 'grayscale(100%)';
+            // stopEditor.disable();
+            // stopBtn.style.background = 'red';
+            // stopBtn.style.filter = 'grayscale(100%)';
+            // crossEditor.disable();
+            // crossBtn.style.background = 'red';
+            // crossBtn.style.filter = 'grayscale(100%)';
         }
     </script>
 </body>

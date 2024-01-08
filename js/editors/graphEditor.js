@@ -9,27 +9,52 @@ class GraphEditor {
         this.isHovered = null;
         this.mouse = null;
         this.isDragging = false;
+    }
+
+    enable() {
         this.#addEventListeners();
-        
+    }
+
+    disable() {
+        this.#removeEventListeners();
+        this.isHovered = false;
+        this.isSelected = false;
     }
 
     #addEventListeners() {
-        // On hover
-        this.canvas.addEventListener('mousemove', this.#handleMouseMove.bind(this));
-
-        // On mouse down
-        this.canvas.addEventListener('mousedown', this.#handleMouseDown.bind(this))// we use arrow function or .bind(this) for this keyword as global
-
-        this.canvas.addEventListener('mouseup', (event) => {
+        this.boundMouseDown = this.#handleMouseDown.bind(this);
+        this.boundMouseMove = this.#handleMouseMove.bind(this);
+        this.boundMouseUp = () => {
             if(!!this.isDragging) {
                 this.isDragging = false;
             }
-        })
+        };
+        this.boundMouseRight = (event) => {
+            event.preventDefault();
+        };
+        // On hover
+        this.canvas.addEventListener('mousemove', this.boundMouseMove);
+
+        // On mouse down
+        this.canvas.addEventListener('mousedown', this.boundMouseDown)// we use arrow function or .bind(this) for this keyword as global
+
+        this.canvas.addEventListener('mouseup', this.boundMouseUp)
 
         // On right click
-        this.canvas.addEventListener('contextmenu', (event) => {
-            event.preventDefault();
-        })
+        this.canvas.addEventListener('contextmenu', this.boundMouseRight)
+    }
+
+    #removeEventListeners() {
+        // On hover
+        this.canvas.removeEventListener('mousemove', this.boundMouseMove);
+
+        // On mouse down
+        this.canvas.removeEventListener('mousedown', this.boundMouseDown)// we use arrow function or .bind(this) for this keyword as global
+
+        this.canvas.removeEventListener('mouseup', this.boundMouseUp)
+
+        // On right click
+        this.canvas.removeEventListener('contextmenu', this.boundMouseRight )
     }
 
     #handleMouseMove(event) {
