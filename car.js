@@ -1,5 +1,5 @@
 class Car {
-    constructor(x, y, width, height, controlType, maxSpeed = 3, color = "blue") {
+    constructor(x, y, width, height, controlType, angle = 0, maxSpeed = 3, color = "blue") {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -10,8 +10,10 @@ class Car {
         this.maxSpeed = maxSpeed;
         this.friction = 0.05;
 
-        this.angle = 0;
+        this.angle = angle;
         this.isDamaged = false;
+
+        this.fitness = 0;
         
         this.useBrain = controlType == 'Ai';
 
@@ -66,6 +68,7 @@ class Car {
     update(roadBorders, traffics) {
         if(!this.isDamaged) {
             this.#move();
+            this.fitness += this.speed;
             this.polygon = this.#createPolygon();
             this.isDamaged = this.#accessDamage(roadBorders, traffics);
         }
