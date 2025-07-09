@@ -10,3 +10,19 @@ body {
 #networkCanvas {
     background-color: black;
 }
+
+.flex {
+    display: flex;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.justify-center {
+    justify-content: center;
+}
+
+.flex-col{
+    flex-direction: column;
+}
